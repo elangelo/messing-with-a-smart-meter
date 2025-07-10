@@ -2,11 +2,10 @@ package main
 
 import (
 	"testing"
-	"time"
 )
 
 func TestParseP1Telegram(t *testing.T) {
-	// Example P1 telegram (simplified)
+	// Example P1 telegram (simplified, electricity only)
 	telegram := `/XMX5LGBBFG1012327662
 
 1-3:0.2.8(42)
@@ -16,8 +15,7 @@ func TestParseP1Telegram(t *testing.T) {
 1-0:2.8.1(000012.345*kWh)
 1-0:2.8.2(000023.456*kWh)
 1-0:1.7.0(00.324*kW)
-1-0:2.7.0(00.000*kW)
-0-1:24.2.1(230315120000W)(00012.345*m3)
+1-0:2.7.0(01.234*kW)
 !1234`
 
 	data, err := ParseP1Telegram(telegram)
@@ -34,24 +32,67 @@ func TestParseP1Telegram(t *testing.T) {
 		t.Errorf("Expected ElectricityConsumed2 to be 234.567, got %f", data.ElectricityConsumed2)
 	}
 
+	if data.ElectricityProduced1 != 12.345 {
+		t.Errorf("Expected ElectricityProduced1 to be 12.345, got %f", data.ElectricityProduced1)
+	}
+
+	if data.ElectricityProduced2 != 23.456 {
+		t.Errorf("Expected ElectricityProduced2 to be 23.456, got %f", data.ElectricityProduced2)
+	}
+
 	if data.CurrentPowerUsage != 324 {
 		t.Errorf("Expected CurrentPowerUsage to be 324W, got %d", data.CurrentPowerUsage)
 	}
 
-	if data.GasConsumption != 12.345 {
-		t.Errorf("Expected GasConsumption to be 12.345, got %f", data.GasConsumption)
+	if data.CurrentPowerProduction != 1234 {
+		t.Errorf("Expected CurrentPowerProduction to be 1234W, got %d", data.CurrentPowerProduction)
 	}
 }
 
-func TestParseP1Timestamp(t *testing.T) {
-	timestamp := "230315123456W"
-	parsed, err := parseP1Timestamp(timestamp)
-	if err != nil {
-		t.Fatalf("Failed to parse timestamp: %v", err)
-	}
+func TestParseP1TelegramEdgeCases(t *testing.T) {
+	t.Run("Empty telegram", func(t *testing.T) {
+		data, err := ParseP1Telegram("")
+		if err != nil {
+			t.Fatalf("Expected no error for empty telegram, got: %v", err)
+		}
 
-	expected := time.Date(2023, 3, 15, 12, 34, 56, 0, time.Local)
-	if !parsed.Equal(expected) {
-		t.Errorf("Expected timestamp %v, got %v", expected, parsed)
-	}
+		// Should return zero values for all fields
+		if data.ElectricityConsumed1 != 0 {
+			t.Errorf("Expected ElectricityConsumed1 to be 0, got %f", data.ElectricityConsumed1)
+		}
+	})
+
+	t.Run("Minimal valid telegram", func(t *testing.T) {
+		telegram := `/XMX5LGBBFG1012327662
+1-0:1.7.0(00.500*kW)
+!1234`
+
+		data, err := ParseP1Telegram(telegram)
+		if err != nil {
+			t.Fatalf("Failed to parse minimal telegram: %v", err)
+		}
+
+		if data.CurrentPowerUsage != 500 {
+			t.Errorf("Expected CurrentPowerUsage to be 500W, got %d", data.CurrentPowerUsage)
+		}
+	})
+
+	t.Run("Production only", func(t *testing.T) {
+		telegram := `/XMX5LGBBFG1012327662
+1-0:2.7.0(02.500*kW)
+!1234`
+
+		data, err := ParseP1Telegram(telegram)
+		if err != nil {
+			t.Fatalf("Failed to parse production telegram: %v", err)
+		}
+
+		if data.CurrentPowerProduction != 2500 {
+			t.Errorf("Expected CurrentPowerProduction to be 2500W, got %d", data.CurrentPowerProduction)
+		}
+
+		if data.CurrentPowerUsage != 0 {
+			t.Errorf("Expected CurrentPowerUsage to be 0W when not specified, got %d", data.CurrentPowerUsage)
+		}
+	})
 }
