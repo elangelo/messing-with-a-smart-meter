@@ -1,0 +1,28 @@
+[Unit]
+Description=Smart Meter Reader
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/samuel.verstraete/src/messting-with-smart-meter
+ExecStart=/home/samuel.verstraete/src/messting-with-smart-meter/smart-meter-reader
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment file
+EnvironmentFile=/home/samuel.verstraete/src/messting-with-smart-meter/.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/samuel.verstraete/src/messting-with-smart-meter
+
+[Install]
+WantedBy=multi-user.target
